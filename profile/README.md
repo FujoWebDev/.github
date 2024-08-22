@@ -13,13 +13,14 @@ take control of their online world.
 - [FujoCoded Website](https://fujocoded.com/)
 - [Why Fujoshi, Anyway?](https://fujocoded.com/fujoshi)
 
-### [Our Projects](https://fujocoded.com/projects)
+## Our Projects
 
 - [The Fujoshi Guide to Web Development](https://www.fujoweb.dev/)
 - [AO3.js](https://github.com/FujoWebDev/AO3.js)
 - [Fandom Coders](https://fancoders.com)
+- [and more...](https://fujocoded.com/projects)
 
-#### Graduated Projects
+### Graduated Projects
 
 - [BobaBoard](https://github.com/bobaboard)
 
