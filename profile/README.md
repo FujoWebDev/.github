@@ -1,6 +1,6 @@
 <p align="center"><img src="https://raw.githubusercontent.com/FujoWebDev/.github/main/profile/images/logo.svg" /></p>
 
-<p align="center"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&duration=4500&color=A700CF&center=true&vCenter=true&multiline=true&width=525&height=110&lines=Our+Mission%3A;Empowering+fujoshi+and+other+online+subcultures+;to+shape+their+web+through+software%2C+education%2C+;and+community+collaboration%2C+since+2024." alt="Our Mission: Empowering fujoshi and other online subcultures to shape their web through software, education, and community collaboration since 2024." /></p>
+<p align="center"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&duration=4500&color=A700CF&center=true&vCenter=true&repeat=false&multiline=true&width=525&height=110&lines=Our+Mission%3A;Empowering+fujoshi+and+other+online+subcultures+;to+shape+their+web+through+software%2C+education%2C+;and+community+collaboration%2C+since+2024." alt="Our Mission: Empowering fujoshi and other online subcultures to shape their web through software, education, and community collaboration since 2024." /></p>
 
 ## A Better Web Together
 
