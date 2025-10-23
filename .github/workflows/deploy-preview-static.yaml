@@ -7,19 +7,10 @@ env:
   #   - if it's a regular commit push, use the main branch (/var/www/site_name/main)
   #   - if there's a "destination" input, meaning it's been manually triggered, use the input value (/var/www/site_name/[value])
 
-on:
-  push:
-    branches:
-      - main # work off main branch
-  pull_request_target: # this workflow triggers either when there's a push to main OR when a PR is opened/updated
-    types: [opened, synchronize, reopened]
-  workflow_dispatch: # it also can be triggered manually, and in that case the destination will be required and called "manual_run"
-    inputs:
-      destination:
-        description: "Define destination base path"
-        required: true
-        default: "manual_run"
 name: Site deploy preview
+
+on:
+  workflow_call:
 
 jobs:
     build:
