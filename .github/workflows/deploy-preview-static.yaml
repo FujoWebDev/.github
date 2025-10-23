@@ -1,0 +1,83 @@
+# prettier-ignore
+env:
+  DEPLOY_PATH: ${{ vars.REMOTE_TARGET }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'push' && 'main' || github.event.inputs.destination}}
+  # this will:
+  #   - start with REMOTE_TARGET, which is usuallly "/var/www/site_name"
+  #   - if this is from a PR, use the PR's number for a subdirectory (/var/www/site_name/12)
+  #   - if it's a regular commit push, use the main branch (/var/www/site_name/main)
+  #   - if there's a "destination" input, meaning it's been manually triggered, use the input value (/var/www/site_name/[value])
+
+on:
+  push:
+    branches:
+      - main # work off main branch
+  pull_request_target: # this workflow triggers either when there's a push to main OR when a PR is opened/updated
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: # it also can be triggered manually, and in that case the destination will be required and called "manual_run"
+    inputs:
+      destination:
+        description: "Define destination base path"
+        required: true
+        default: "manual_run"
+name: Site deploy preview
+
+jobs:
+    build:
+        runs-on: ubuntu-latest # use github runner, not our self-hosted one
+        if: |
+          github.event_name != 'pull_request_target' ||
+          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association)
+        permissions: # set permissions
+            pull-requests: write
+            contents: read
+        steps:
+            - name: update PR
+              if: ${{ github.event_name == 'pull_request' }} # execute this step only if there is a PR
+              uses: thollander/actions-comment-pull-request@v2
+              with:
+                 message: |
+                     Started attempt to build a new deploy preview for PR ${{ github.event.pull_request.number }}.
+                 comment_tag: pr_published
+            - name: Checkout your repository using git
+              uses: actions/checkout@v4 # check out the repo
+              with:
+                 ref:
+                     ${{ github.event_name == 'pull_request' &&
+                     github.event.pull_request.head.sha || github.ref }} # if this was triggered by a PR, then match with the commit that the PR uses. otherwise, use the commit that the workflow was triggered from
+            - name: Install, build, and upload your site output # install dependencies, build the site, then upload the result
+              uses: withastro/action@v4
+            - run: ls -la # debugging step: check if the built files uploaded correctly
+
+    deploy-website:
+        runs-on: ubuntu-latest # github runner, not ours
+        if: |
+          github.event_name != 'pull_request_target' ||
+          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association)
+        permissions:
+          pull-requests: write
+          contents: read
+        needs: build
+        steps:
+            - uses: actions/download-artifact@v4 # download the artifact from the previous step
+              with:
+                  name: github-pages
+            - run: ls -la # debugging step: check if built files downloaded fine & in the right place
+            - run: mkdir dist/
+            - run: tar -xvf artifact.tar -C dist/
+            - run: ls -la
+            - name: Deploy to Server
+              uses: easingthemes/ssh-deploy@main # deploy via SSH and rsync
+              with:
+                  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+                  ARGS: "-rlgoDzvc -i --delete" # flags are: recursive, links (recreate symlinks), groups (match groups on target), owner (match owner on target), devices, compress (smaller file size, makes transfer faster), verbose (for debugging), checksum (this is how rsync checks that an update is needed), itemize changes (list all the changes), delete (get rid of files we don't need)
+                  SOURCE: "dist/"
+                  REMOTE_HOST: ${{ vars.REMOTE_HOST }} # the target server to push the deployed site files to
+                  REMOTE_USER: ${{ vars.REMOTE_USER }} # the user that the server will operate as for running the files
+                  TARGET: ${{ env.DEPLOY_PATH}} # see line 4 for step-by-step explanation of this variable
+            - name: update PR
+              if: ${{ github.event_name == 'pull_request' }}
+              uses: thollander/actions-comment-pull-request@v2 # if there's a PR, update it with a comment that a new deploy preview has been created
+              with:
+                  message: |
+                      Created a new deploy preview for PR ${{ github.event.pull_request.number }}. [See preview](${{ vars.PREVIEW_SITE_URL }}/${{ github.event.pull_request.number }}/).
+                  comment_tag: pr_published
