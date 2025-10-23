@@ -1,6 +1,5 @@
 {
-    "name": "Deploy preview (static version) workflow",
-    "description": "Deploy a static site",
+    "name": "Deploy preview workflow (static site)",
+    "description": "Deploy a static site to the Fujocoded servers",
     "iconName": "logo-rainbow"
 }
-

@@ -1,0 +1,7 @@
+{
+    "name": "Deploy static site (synced)",
+    "description": "Deploy a static site to the FujoCoded servers. The configuration is shared across all repos.",
+    "iconName": "logo-rainbow"
+}
+
+
