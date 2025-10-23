@@ -1,6 +1,6 @@
 # prettier-ignore
 env:
-  DEPLOY_PATH: ${{ vars.REMOTE_TARGET }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'push' && 'main' || github.event.inputs.destination}}
+  DEPLOY_PATH: ${{ inputs.REMOTE_TARGET }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'push' && 'main' || github.event.inputs.destination}}
   # this will:
   #   - start with REMOTE_TARGET, which is usuallly "/var/www/site_name"
   #   - if this is from a PR, use the PR's number for a subdirectory (/var/www/site_name/12)
@@ -11,6 +11,22 @@ name: Site deploy preview
 
 on:
   workflow_call:
+    secrets:
+      SSH_PRIVATE_KEY:
+        required: true
+    inputs:
+      REMOTE_TARGET:
+        required: true
+        type: string
+      REMOTE_HOST:
+        required: true
+        type: string
+      REMOTE_USER:
+        required: true
+        type: string
+      PREVIEW_SITE_URL:
+        required: true
+        type: string
 
 jobs:
     build:
@@ -62,13 +78,13 @@ jobs:
                   SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
                   ARGS: "-rlgoDzvc -i --delete" # flags are: recursive, links (recreate symlinks), groups (match groups on target), owner (match owner on target), devices, compress (smaller file size, makes transfer faster), verbose (for debugging), checksum (this is how rsync checks that an update is needed), itemize changes (list all the changes), delete (get rid of files we don't need)
                   SOURCE: "dist/"
-                  REMOTE_HOST: ${{ vars.REMOTE_HOST }} # the target server to push the deployed site files to
-                  REMOTE_USER: ${{ vars.REMOTE_USER }} # the user that the server will operate as for running the files
+                  REMOTE_HOST: ${{ inputs.REMOTE_HOST }} # the target server to push the deployed site files to
+                  REMOTE_USER: ${{ inputs.REMOTE_USER }} # the user that the server will operate as for running the files
                   TARGET: ${{ env.DEPLOY_PATH}} # see line 4 for step-by-step explanation of this variable
             - name: update PR
               if: ${{ github.event_name == 'pull_request' }}
               uses: thollander/actions-comment-pull-request@v2 # if there's a PR, update it with a comment that a new deploy preview has been created
               with:
                   message: |
-                      Created a new deploy preview for PR ${{ github.event.pull_request.number }}. [See preview](${{ vars.PREVIEW_SITE_URL }}/${{ github.event.pull_request.number }}/).
+                      Created a new deploy preview for PR ${{ github.event.pull_request.number }}. [See preview](${{ inputs.PREVIEW_SITE_URL }}/${{ github.event.pull_request.number }}/).
                   comment_tag: pr_published
