@@ -11,6 +11,10 @@ on:
         required: true
         default: "manual_run"
 
+permissions: # set permissions
+  pull-requests: write
+  contents: read
+
 jobs:
   call-workflow:
     uses: FujoWebDev/.github/.github/workflows/deploy-preview-dynamic.yaml@main
