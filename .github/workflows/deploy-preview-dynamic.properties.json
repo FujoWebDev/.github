@@ -1,0 +1,5 @@
+{
+    "name": "Deploy preview workflow (dynamic site)",
+    "description": "Deploy a dynamic site to the Fujocoded servers",
+    "iconName": "logo-rainbow"
+}
