@@ -78,7 +78,6 @@ jobs:
               with:
                   name: artifact
             - run: ls -la # debugging step: check if built files downloaded fine & in the right place
-            - run: mkdir dist/
             - run: tar -xvf artifact.tar -C dist/
             - run: ls -la
             - name: Deploy to Server
