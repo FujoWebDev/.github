@@ -83,7 +83,7 @@ jobs:
               with:
                   SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
                   ARGS: "-rlgoDzvc -i --delete" # flags are: recursive, links (recreate symlinks), groups (match groups on target), owner (match owner on target), devices, compress (smaller file size, makes transfer faster), verbose (for debugging), checksum (this is how rsync checks that an update is needed), itemize changes (list all the changes), delete (get rid of files we don't need)
-                  SOURCE: "dist/"
+                  SOURCE: "."
                   REMOTE_HOST: ${{ inputs.REMOTE_HOST }} # the target server to push the deployed site files to
                   REMOTE_USER: ${{ inputs.REMOTE_USER }} # the user that the server will operate as for running the files
                   TARGET: ${{ env.DEPLOY_PATH}} # see line 4 for step-by-step explanation of this variable
