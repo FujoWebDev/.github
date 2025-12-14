@@ -90,11 +90,11 @@ jobs:
                   SCRIPT_AFTER: |
                     set -e
                     # Make sure that deploy path exists, or fail silently
-                    if [ -z "${{ env.DEV_DEPLOY_PATH }}" ]; then
-                      echo "ERROR: DEV_DEPLOY_PATH is not set"
+                    if [ -z "${{ env.DEPLOY_PATH }}" ]; then
+                      echo "ERROR: DEPLOY_PATH is not set"
                       exit 1
                     fi
-                    cd ${{ env.DEV_DEPLOY_PATH }} # this is used again but to determine what the branch name is and change directories to it
+                    cd ${{ env.DEPLOY_PATH }} # this is used again but to determine what the branch name is and change directories to it
                     # after the files get uploaded, we enter the new directory and install the dependencies now on the server
                     npm ci
             - name: update PR
