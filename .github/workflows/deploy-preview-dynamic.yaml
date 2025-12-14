@@ -53,7 +53,7 @@ jobs:
                      github.event.pull_request.head.sha || github.ref }} # if this was triggered by a PR, then match with the commit that the PR uses. otherwise, use the commit that the workflow was triggered from
             - name: install & build
               run: |
-                npm install
+                npm ci
                 npm run build
             - name: upload artifacts # upload the built site so that the next step can access it
               uses: actions/upload-artifact@v4
@@ -88,9 +88,15 @@ jobs:
                   REMOTE_USER: ${{ inputs.REMOTE_USER }} # the user that the server will operate as for running the files
                   TARGET: ${{ env.DEPLOY_PATH}} # see line 4 for step-by-step explanation of this variable
                   SCRIPT_AFTER: |
+                    set -e
+                    # Make sure that deploy path exists, or fail silently
+                    if [ -z "${{ env.DEV_DEPLOY_PATH }}" ]; then
+                      echo "ERROR: DEV_DEPLOY_PATH is not set"
+                      exit 1
+                    fi
                     cd ${{ env.DEV_DEPLOY_PATH }} # this is used again but to determine what the branch name is and change directories to it
                     # after the files get uploaded, we enter the new directory and install the dependencies now on the server
-                    npm install
+                    npm ci
             - name: update PR
               if: ${{ github.event_name == 'pull_request' }}
               uses: thollander/actions-comment-pull-request@v2 # if there's a PR, update it with a comment that a new deploy preview has been created
