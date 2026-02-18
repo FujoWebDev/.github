@@ -2,8 +2,8 @@ on:
   push:
     branches:
       - main # work off main branch
-  pull_request_target: # this workflow triggers either when there's a push to main OR when a PR is opened/updated
-    types: [opened, synchronize, reopened]
+  pull_request_target: # this workflow triggers either when there's a push to main OR when a PR is opened/updated/closed
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch: # it also can be triggered manually, and in that case the destination will be required and called "manual_run"
     inputs:
       destination:
@@ -14,6 +14,10 @@ on:
 permissions: # set permissions
   pull-requests: write
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   call-workflow:
