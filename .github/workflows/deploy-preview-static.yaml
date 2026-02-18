@@ -1,11 +1,11 @@
 # prettier-ignore
 env:
-  DEPLOY_PATH: ${{ inputs.REMOTE_TARGET }}${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.event_name == 'push' && 'main' || github.event.inputs.destination}}
-  # this will:
-  #   - start with REMOTE_TARGET, which is usuallly "/var/www/site_name"
-  #   - if this is from a PR, use the PR's number for a subdirectory (/var/www/site_name/12)
-  #   - if it's a regular commit push, use the main branch (/var/www/site_name/main)
-  #   - if there's a "destination" input, meaning it's been manually triggered, use the input value (/var/www/site_name/[value])
+  # runs both on fork PRs and regular PRs
+  IS_PR: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
+  # The PR number (empty if not a PR)
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  # PR head SHA for PRs, branch ref, or whatever ref the user manually triggered the action from
+  REF_TO_CHECKOUT: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && github.event.pull_request.head.sha || github.ref }}
 
 name: Site deploy preview
 
@@ -28,44 +28,71 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
     build:
-        runs-on: ubuntu-latest # use github runner, not our self-hosted one
+        runs-on: ubuntu-latest
         if: |
-          github.event_name != 'pull_request_target' ||
-          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association)
-        permissions: # set permissions
+          github.event.action != 'closed' &&
+          (github.event_name != 'pull_request_target' ||
+          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association))
+        permissions:
             pull-requests: write
             contents: read
         steps:
-            - name: update PR
-              if: ${{ github.event_name == 'pull_request' }} # execute this step only if there is a PR
+            - name: announce deploy preview attempt
+              if: ${{ env.IS_PR == 'true' }}
               uses: thollander/actions-comment-pull-request@v2
               with:
                  message: |
-                     Started attempt to build a new deploy preview for PR ${{ github.event.pull_request.number }}.
+                     Started attempt to build a new deploy preview for PR ${{ env.PR_NUMBER }}.
+                 # This makes it easier to find this comment again to update it
                  comment_tag: pr_published
             - name: Checkout your repository using git
-              uses: actions/checkout@v4 # check out the repo
+              uses: actions/checkout@v4
               with:
-                 ref:
-                     ${{ github.event_name == 'pull_request' &&
-                     github.event.pull_request.head.sha || github.ref }} # if this was triggered by a PR, then match with the commit that the PR uses. otherwise, use the commit that the workflow was triggered from
-            - name: Install, build, and upload your site output # install dependencies, build the site, then upload the result
+                 ref: ${{ env.REF_TO_CHECKOUT }}
+            - name: Install, build, and upload your site output
               uses: withastro/action@v4
             - run: ls -la # debugging step: check if the built files uploaded correctly
 
     deploy-website:
-        runs-on: ubuntu-latest # github runner, not ours
+        runs-on: ubuntu-latest
+        # For security reasons, only run this if the PR was authored by someone we know
         if: |
-          github.event_name != 'pull_request_target' ||
-          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association)
+          github.event.action != 'closed' &&
+          (github.event_name != 'pull_request_target' ||
+          contains('MEMBER OWNER COLLABORATOR', github.event.pull_request.author_association))
         permissions:
           pull-requests: write
           contents: read
         needs: build
         steps:
-            - uses: actions/download-artifact@v4 # download the artifact from the previous step
+            - name: Compute deploy path
+              # DEPLOY_PATH = REMOTE_TARGET + suffix
+              #   PR → /42, push → /branch_name (ref_name), manual → /input_value
+              run: |
+                if [ "${{ env.IS_PR }}" = "true" ]; then
+                  SUFFIX="${{ env.PR_NUMBER }}"
+                elif [ "${{ github.event_name }}" = "push" ]; then
+                  SUFFIX="${{ github.ref_name }}"
+                else
+                  SUFFIX="${{ github.event.inputs.destination }}"
+                fi
+                echo "DEPLOY_PATH=${{ inputs.REMOTE_TARGET }}${SUFFIX}" >> "$GITHUB_ENV"
+            - name: Assert DEPLOY_PATH is not the root target
+              run: |
+                if [ "${{ env.DEPLOY_PATH }}" = "${{ inputs.REMOTE_TARGET }}" ]; then
+                  echo "ERROR: DEPLOY_PATH equals REMOTE_TARGET with no suffix."
+                  echo "This would deploy to the root and wipe all other deploys."
+                  echo "DEPLOY_PATH: ${{ env.DEPLOY_PATH }}"
+                  echo "REMOTE_TARGET: ${{ inputs.REMOTE_TARGET }}"
+                  exit 1
+                fi
+            - uses: actions/download-artifact@v4 # download the artifact from the build step
               with:
                   name: github-pages
             - run: ls -la # debugging step: check if built files downloaded fine & in the right place
@@ -80,11 +107,38 @@ jobs:
                   SOURCE: "dist/"
                   REMOTE_HOST: ${{ inputs.REMOTE_HOST }} # the target server to push the deployed site files to
                   REMOTE_USER: ${{ inputs.REMOTE_USER }} # the user that the server will operate as for running the files
-                  TARGET: ${{ env.DEPLOY_PATH}} # see line 4 for step-by-step explanation of this variable
+                  TARGET: ${{ env.DEPLOY_PATH }} # Computed earlier
             - name: update PR
-              if: ${{ github.event_name == 'pull_request' }}
+              if: ${{ env.IS_PR == 'true' }}
               uses: thollander/actions-comment-pull-request@v2 # if there's a PR, update it with a comment that a new deploy preview has been created
               with:
                   message: |
-                      Created a new deploy preview for PR ${{ github.event.pull_request.number }}. [See preview](${{ inputs.PREVIEW_SITE_URL }}/${{ github.event.pull_request.number }}/).
+                      Created a new deploy preview for PR ${{ env.PR_NUMBER }}. [See preview](${{ inputs.PREVIEW_SITE_URL }}/${{ env.PR_NUMBER }}/).
+                  comment_tag: pr_published
+
+    cleanup-preview:
+        runs-on: ubuntu-latest
+        if: ${{ github.event.action == 'closed' }}
+        permissions:
+          pull-requests: write
+        steps:
+            - name: Remove preview from server
+              uses: appleboy/ssh-action@v1
+              with:
+                  host: ${{ inputs.REMOTE_HOST }}
+                  username: ${{ inputs.REMOTE_USER }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  script: |
+                    DEPLOY_PATH="${{ inputs.REMOTE_TARGET }}${{ github.event.pull_request.number }}"
+                    if [ -d "$DEPLOY_PATH" ]; then
+                      rm -rf "$DEPLOY_PATH"
+                      echo "Removed preview at $DEPLOY_PATH"
+                    else
+                      echo "No preview found at $DEPLOY_PATH"
+                    fi
+            - name: Comment on PR
+              uses: thollander/actions-comment-pull-request@v2
+              with:
+                  message: |
+                      Preview for PR ${{ github.event.pull_request.number }} has been cleaned up.
                   comment_tag: pr_published
